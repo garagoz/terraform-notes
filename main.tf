@@ -101,6 +101,10 @@ resource "aws_instance" "controlplane" {
   subnet_id     = aws_subnet.public_subnet[0].id #replace with your subnet id
   vpc_security_group_ids = [aws_security_group.arslan_sg.id] #replace with your security group id
 
+   root_block_device {
+    volume_size = 12 # Set root volume to 12GB
+  }
+
   tags = {
     Name = "ec2-instance"
   }
