@@ -50,7 +50,7 @@ resource "aws_internet_gateway" "ig" {
 # Elastic-IP (eip) for NAT
 resource "aws_eip" "nat_eip" {
   # vpc        = true
-  domain = "vpc"
+  domain     = "vpc"
   depends_on = [aws_internet_gateway.ig]
 }
 
@@ -110,9 +110,32 @@ resource "aws_route_table_association" "private_subnet_asso" {
   route_table_id = aws_route_table.private_rt.id
 }
 
+# Create security group
+resource "aws_security_group" "arslan_sg" {
+  name        = "arslan-sg"
+  description = "arslan-sg"
+  vpc_id      = aws_vpc.vpc.id # Replace with your VPC ID or resource
 
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1" # all protocols
+    cidr_blocks = ["0.0.0.0/0"] # all IPs
+    description = "Allow all inbound traffic"
+  }
 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1" # all protocols
+    cidr_blocks = ["0.0.0.0/0"] # all IPs
+    description = "Allow all outbound traffic"
+  }
 
+  tags = {
+    Name = "allow-all-inbound"
+  }
+}
 
 
 
