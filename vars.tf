@@ -1,14 +1,17 @@
 variable "region" {
+  type = string
   default = "us-east-1"
 }
 
 variable "environment" {
+  type = string
   default = "arslan"
 }
 
 variable "vpc_cidr" {
-  default     = "10.0.0.0/16"
+  type = string
   description = "CIDR block of the vpc"
+  default     = "10.0.0.0/16"
 }
 
 variable "public_subnet_cidrs" {
