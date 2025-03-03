@@ -1,5 +1,4 @@
-
-# vpc,subnet,igw,routetable,routes,route_asso,security group,keypair, ec2
+# vpc, 2 public and private subnets,routetables, igw, nat, elastic ip, security group
 
 # VPC
 resource "aws_vpc" "vpc" {
@@ -27,6 +26,20 @@ resource "aws_subnet" "public_subnet" {
   }
 }
 
+# Private Subnet
+resource "aws_subnet" "private_subnet" {
+  vpc_id                  = aws_vpc.vpc.id
+  count                   = length(var.private_subnet_cidrs)
+  cidr_block              = element(var.private_subnet_cidrs, count.index)
+  availability_zone       = element(var.availability_zones, count.index)
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name        = "${var.environment}-${element(var.availability_zones, count.index)}-private-subnet"
+    Environment = "${var.environment}"
+  }
+}
+
 # Internet gateway
 resource "aws_internet_gateway" "ig" {
   vpc_id = aws_vpc.vpc.id
@@ -36,6 +49,31 @@ resource "aws_internet_gateway" "ig" {
   }
 }
 
+# Elastic-IP (eip) for NAT
+resource "aws_eip" "nat_eip" {
+  # vpc        = true
+  domain     = "vpc"
+  depends_on = [aws_internet_gateway.ig]
+}
+
+# NAT Gateway
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = element(aws_subnet.public_subnet.*.id, 0)
+  tags = {
+    Name        = "nat-gateway-${var.environment}"
+    Environment = "${var.environment}"
+  }
+}
+
+# Routing tables to route traffic for Private Subnet
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.vpc.id
+  tags = {
+    Name        = "${var.environment}-private-route-table"
+    Environment = "${var.environment}"
+  }
+}
 
 # Routing tables to route traffic for Public Subnet
 resource "aws_route_table" "public_rt" {
@@ -54,6 +92,12 @@ resource "aws_route" "public_internet_gateway" {
   gateway_id             = aws_internet_gateway.ig.id
 }
 
+# Route for NAT Gateway
+resource "aws_route" "private_internet_gateway" {
+  route_table_id         = aws_route_table.private_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_nat_gateway.nat.id
+}
 
 # Route table associations for both Public subnet and Private subnet
 resource "aws_route_table_association" "public_subnet_asso" {
@@ -62,6 +106,11 @@ resource "aws_route_table_association" "public_subnet_asso" {
   route_table_id = aws_route_table.public_rt.id
 }
 
+resource "aws_route_table_association" "private_subnet_asso" {
+  count          = length(var.private_subnet_cidrs)
+  subnet_id      = element(aws_subnet.private_subnet.*.id, count.index)
+  route_table_id = aws_route_table.private_rt.id
+}
 
 # Create security group
 resource "aws_security_group" "arslan_sg" {
@@ -87,29 +136,5 @@ resource "aws_security_group" "arslan_sg" {
 
   tags = {
     Name = "allow-all-inbound"
-  }
-}
-
-
-# Create a keypair
-resource "aws_key_pair" "awskey" {
-  key_name   = "awskey"
-  public_key = file("~/.ssh/id_ed25519.pub") # Replace with your public key path
-}
-
-# Create ec2 instance
-resource "aws_instance" "controlplane" {
-  ami           = "ami-04b4f1a9cf54c11d0" # Replace with a valid AMI ID
-  instance_type = "t3.medium"
-  key_name      = aws_key_pair.awskey.key_name
-  subnet_id     = aws_subnet.public_subnet[0].id #replace with your subnet id
-  vpc_security_group_ids = [aws_security_group.arslan_sg.id] #replace with your security group id
-
-   root_block_device {
-    volume_size = 12 # Set root volume to 12GB
-  }
-
-  tags = {
-    Name = "ec2-instance"
   }
 }
