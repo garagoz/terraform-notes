@@ -1,27 +1,72 @@
------ Terraform Provisioners ----
-1. provisioner "file" -> This uploads a file from your local machine to the remote VM.
-2. provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
-3. provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
-
-
 ---- Most used AWS resource types  ------
-Terraform Resource | Purpose
-aws_instance | Provision EC2 virtual machines
-aws_vpc | Create a Virtual Private Cloud (VPC)
-aws_subnet | Define subnets within a VPC
-aws_security_group | Firewall rules for instances and services
-aws_iam_role & aws_iam_policy | Identity and access management
-aws_s3_bucket | Object storage for files, logs, static websites
-aws_route_table, aws_internet_gateway, aws_nat_gateway | Routing & internet access
-aws_elb or aws_lb | Load balancers (classic or application)
-aws_autoscaling_group | Automatically scale EC2 instances
-aws_rds_instance | Managed relational databases (MySQL, PostgreSQL, etc.)
-aws_lambda_function | Deploy serverless compute
-aws_cloudwatch_log_group | Centralized logging and metrics
-aws_ecs_cluster & aws_ecs_task_definition | Container orchestration
-aws_eks_cluster | Kubernetes on AWS
 
------- AWS Key Pair create resource create --------
+aws_instance                                            | Provision EC2 virtual machines
+aws_vpc                                                 | Create a Virtual Private Cloud (VPC)
+aws_subnet                                              | Define subnets within a VPC
+aws_security_group                                      | Firewall rules for instances and services
+aws_iam_role & aws_iam_policy                           | Identity and access management
+aws_s3_bucket                                           | Object storage for files, logs, static websites
+aws_route_table, aws_internet_gateway, aws_nat_gateway  | Routing & internet access
+aws_elb or aws_lb                                       | Load balancers (classic or application)
+aws_autoscaling_group                                   | Automatically scale EC2 instances
+aws_rds_instance                                        | Managed relational databases (MySQL, PostgreSQL, etc.)
+aws_lambda_function                                     | Deploy serverless compute
+aws_cloudwatch_log_group                                | Centralized logging and metrics
+aws_ecs_cluster & aws_ecs_task_definition               | Container orchestration
+aws_eks_cluster                                         | Kubernetes on AWS
+
+----- Terraform Provisioners ----
+1. Provisioner "file" -> This uploads a file from your local machine to the remote VM.
+
+    resource "aws_instance" "example" {
+    ami           = "ami-12345678"
+    instance_type = "t2.micro"
+
+    provisioner "file" {
+        source      = "local_script.sh"      # Local file path
+        destination = "/tmp/remote_script.sh" # Remote destination
+    }
+
+    connection {
+        type     = "ssh"
+        user     = "ec2-user"
+        private_key = file("~/.ssh/id_rsa")
+        host     = self.public_ip
+    }
+    }
+
+2. Provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
+
+    resource "aws_instance" "example" {
+    ami           = "ami-12345678"
+    instance_type = "t2.micro"
+
+    provisioner "file" {
+        source      = "local_script.sh"      # Local file path
+        destination = "/tmp/remote_script.sh" # Remote destination
+    }
+
+    connection {
+        type     = "ssh"
+        user     = "ec2-user"
+        private_key = file("~/.ssh/id_rsa")
+        host     = self.public_ip
+    }
+    }    
+
+3. Provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
+
+    resource "aws_instance" "example" {
+    ami           = "ami-12345678"
+    instance_type = "t2.micro"
+
+    provisioner "local-exec" {
+        command = "echo 'Instance created: ${self.public_ip}' >> created_instances.txt"
+    }
+    }
+
+------ AWS Key Pair  --------
+
 resource "aws_key_pair" "my_key" {
   key_name   = "my-keypair"
   public_key = file("~/.ssh/id_rsa.pub")
