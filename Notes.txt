@@ -1,4 +1,4 @@
----- Most used AWS resource types  ------
+---------------------- Most used AWS resource types ----------------------
 
 aws_instance                                            | Provision EC2 virtual machines
 aws_vpc                                                 | Create a Virtual Private Cloud (VPC)
@@ -15,7 +15,7 @@ aws_cloudwatch_log_group                                | Centralized logging an
 aws_ecs_cluster & aws_ecs_task_definition               | Container orchestration
 aws_eks_cluster                                         | Kubernetes on AWS
 
------ Terraform Provisioners ----
+---------------------- Terraform Provisioners ----------------------
 
     resource "aws_instance" "example" {
     ami           = "ami-12345678"
@@ -48,10 +48,27 @@ aws_eks_cluster                                         | Kubernetes on AWS
         }
     }
 
+---------------------- AWS Terraform Outputs ----------------------
 
------- AWS Key Pair  --------
+output "PublicIP" {
+  value = aws_instance.my_instance.public_ip
+}
+
+---------------------- AWS Terraform Backend ----------------------
+
+terraform {
+  backend "s3" {
+    bucket         = "terraform-state-tore"
+    key            = "terraform/state"
+    region         = "us-east-1"
+    
+  }
+}
+
+---------------------- AWS Key Pair ----------------------
 
 resource "aws_key_pair" "my_key" {
   key_name   = "my-keypair"
   public_key = file("~/.ssh/id_rsa.pub")
 }
+
