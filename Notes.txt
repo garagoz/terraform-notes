@@ -16,54 +16,38 @@ aws_ecs_cluster & aws_ecs_task_definition               | Container orchestratio
 aws_eks_cluster                                         | Kubernetes on AWS
 
 ----- Terraform Provisioners ----
-1. Provisioner "file" -> This uploads a file from your local machine to the remote VM.
 
     resource "aws_instance" "example" {
     ami           = "ami-12345678"
     instance_type = "t2.micro"
 
-    provisioner "file" {
-        source      = "local_script.sh"      # Local file path
-        destination = "/tmp/remote_script.sh" # Remote destination
+        # Provisioner "file" -> This uploads a file from your local machine to the remote VM.
+        provisioner "file" {
+            source      = "local_script.sh"      # Local file path
+            destination = "/tmp/remote_script.sh" # Remote destination
+        }
+
+        # Provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
+        provisioner "remote-exec" {
+            inline = [
+            "sudo apt-get update",
+            "sudo apt-get install -y nginx"
+            ]
+        }
+
+        # Provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
+        provisioner "local-exec" {
+            command = "echo 'Instance created: ${self.public_ip}' >> created_instances.txt"
+        }
+
+        connection {
+            type     = "ssh"
+            user     = "ec2-user"
+            private_key = file("~/.ssh/id_rsa")
+            host     = self.public_ip
+        }
     }
 
-    connection {
-        type     = "ssh"
-        user     = "ec2-user"
-        private_key = file("~/.ssh/id_rsa")
-        host     = self.public_ip
-    }
-    }
-
-2. Provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
-
-    resource "aws_instance" "example" {
-    ami           = "ami-12345678"
-    instance_type = "t2.micro"
-
-    provisioner "file" {
-        source      = "local_script.sh"      # Local file path
-        destination = "/tmp/remote_script.sh" # Remote destination
-    }
-
-    connection {
-        type     = "ssh"
-        user     = "ec2-user"
-        private_key = file("~/.ssh/id_rsa")
-        host     = self.public_ip
-    }
-    }    
-
-3. Provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
-
-    resource "aws_instance" "example" {
-    ami           = "ami-12345678"
-    instance_type = "t2.micro"
-
-    provisioner "local-exec" {
-        command = "echo 'Instance created: ${self.public_ip}' >> created_instances.txt"
-    }
-    }
 
 ------ AWS Key Pair  --------
 
