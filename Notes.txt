@@ -1,0 +1,4 @@
+----- Terraform Provisioners ----
+1. provisioner "file" -> This uploads a file from your local machine to the remote VM.
+2. provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
+3. provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
