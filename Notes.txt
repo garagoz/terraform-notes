@@ -1,3 +1,7 @@
+###### Terraform AWS Documentation #######
+https://registry.terraform.io/providers/hashicorp/aws/latest/docs
+
+
 ---------------------- Most used AWS resource types ----------------------
 
 aws_instance                                            | Provision EC2 virtual machines
@@ -17,45 +21,43 @@ aws_eks_cluster                                         | Kubernetes on AWS
 
 ---------------------- Terraform Provisioners ----------------------
 
-    resource "aws_instance" "example" {
-    ami           = "ami-12345678"
-    instance_type = "t2.micro"
+  resource "aws_instance" "example" {
+  ami           = "ami-12345678"
+  instance_type = "t2.micro"
 
-        # Provisioner "file" -> This uploads a file from your local machine to the remote VM.
-        provisioner "file" {
-            source      = "local_script.sh"      # Local file path
-            destination = "/tmp/remote_script.sh" # Remote destination
-        }
+      # Provisioner "file" -> This uploads a file from your local machine to the remote VM.
+      provisioner "file" {
+          source      = "local_script.sh"      # Local file path
+          destination = "/tmp/remote_script.sh" # Remote destination
+      }
 
-        # Provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
-        provisioner "remote-exec" {
-            inline = [
-            "sudo apt-get update",
-            "sudo apt-get install -y nginx"
-            ]
-        }
+      # Provisioner "remote-exec" -> Executes a command or script on the remote resource (like an EC2 instance).
+      provisioner "remote-exec" {
+          inline = [
+          "sudo apt-get update",
+          "sudo apt-get install -y nginx"
+          ]
+      }
 
-        # Provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
-        provisioner "local-exec" {
-            command = "echo 'Instance created: ${self.public_ip}' >> created_instances.txt"
-        }
+      # Provisioner "local-exec" -> Runs a command on your local machine, not the remote one.
+      provisioner "local-exec" {
+          command = "echo 'Instance created: ${self.public_ip}' >> created_instances.txt"
+      }
 
-        connection {
-            type     = "ssh"
-            user     = "ec2-user"
-            private_key = file("~/.ssh/id_rsa")
-            host     = self.public_ip
-        }
-    }
+      connection {
+          type     = "ssh"
+          user     = "ec2-user"
+          private_key = file("~/.ssh/id_rsa")
+          host     = self.public_ip
+      }
+  }
 
 ---------------------- AWS Terraform Outputs ----------------------
-
 output "PublicIP" {
   value = aws_instance.my_instance.public_ip
 }
 
 ---------------------- AWS Terraform Backend ----------------------
-
 terraform {
   backend "s3" {
     bucket         = "terraform-state-tore"
@@ -66,9 +68,127 @@ terraform {
 }
 
 ---------------------- AWS Key Pair ----------------------
-
 resource "aws_key_pair" "my_key" {
   key_name   = "my-keypair"
   public_key = file("~/.ssh/id_rsa.pub")
 }
 
+---------------------- AWS VPC ----------------------
+resource "aws_vpc" "myvpc" {
+  cidr_block           = "10.0.0.0/16"
+  instance_tenancy     = "default"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name    = "${local.mytag}-vpc"
+    Project = local.mytag
+  }
+}
+
+---------------------- AWS Subnet ----------------------
+resource "aws_subnet" "public-subnet" {
+  vpc_id                  = aws_vpc.myvpc.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "us-east-1a"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name    = "${local.mytag}-subnet-pub"
+    Project = local.mytag
+  }
+}
+
+
+---------------------- AWS Internet Gateway ----------------------
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.myvpc.id
+
+  tags = {
+    Name    = "${local.mytag}-igw"
+    Project = local.mytag
+  }
+}
+
+
+---------------------- AWS Route Table ----------------------
+resource "aws_route_table" "public-rt" {
+  vpc_id = aws_vpc.myvpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+}
+
+
+---------------------- AWS Route Table Association ----------------------
+resource "aws_route_table_association" "rt-assoc" {
+  subnet_id      = aws_subnet.public-subnet.id
+  route_table_id = aws_route_table.public-rt.id
+}
+
+
+---------------------- AWS Security Group ----------------------
+resource "aws_security_group" "tore-sg" {
+  name        = "tore-sg"
+  description = "tore-sg"
+  vpc_id      = aws_vpc.myvpc.id # Replace with your VPC ID or resource
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"          # all protocols
+    cidr_blocks = ["0.0.0.0/0"] # all IPs
+    description = "Allow all inbound traffic"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"          # all protocols
+    cidr_blocks = ["0.0.0.0/0"] # all IPs
+    description = "Allow all outbound traffic"
+  }
+
+  tags = {
+    Name = "allow-all-inbound"
+  }
+}
+
+
+---------------------- AWS Ec2 Instance with provision files ----------------------
+resource "aws_instance" "tore-ec2" {
+  count                  = 1
+  ami                    = var.AMIS[var.REGION]
+  instance_type          = "t2.medium"
+  availability_zone      = var.AZ1
+  key_name               = aws_key_pair.awskey.key_name
+  subnet_id              = aws_subnet.public-subnet.id
+  vpc_security_group_ids = [aws_security_group.tore-sg.id]
+
+  provisioner "file" {
+    source      = "kubeadm.sh"      # Local file path
+    destination = "/tmp/kubeadm.sh" # Remote destination
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/kubeadm.sh",
+      "sudo /tmp/kubeadm.sh"
+    ]
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = file("~/.ssh/id_ed25519")
+    host        = self.public_ip
+  }
+
+  tags = {
+    Name    = "jenkins"
+    Project = "tore"
+  }
+
+}
